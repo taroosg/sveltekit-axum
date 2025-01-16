@@ -1,0 +1,60 @@
+version: '3.7'
+
+services:
+  # ----- TiDB (分散DB) -----
+  pd:
+    image: pingcap/pd:latest
+    container_name: pd
+    command:
+      - "--name=pd"
+      - "--data-dir=pd"
+      - "--client-urls=http://0.0.0.0:2379"
+      - "--peer-urls=http://0.0.0.0:2380"
+      - "--initial-cluster=pd=http://pd:2380"
+      - "--log-level=info"
+    ports:
+      - "2379:2379"
+
+  tikv:
+    image: pingcap/tikv:latest
+    container_name: tikv
+    command:
+      - "--addr=0.0.0.0:20160"
+      - "--advertise-addr=tikv:20160"
+      - "--pd=pd:2379"
+      - "--data-dir=tikv"
+      - "--log-level=info"
+    depends_on:
+      - pd
+    ports:
+      - "20160:20160"
+
+  tidb:
+    image: pingcap/tidb:latest
+    container_name: tidb
+    command:
+      - "--store=tikv"
+      - "--path=pd:2379"
+      - "--log-level=info"
+    depends_on:
+      - pd
+      - tikv
+    ports:
+      - "4000:4000"
+    environment:
+      - TZ=Asia/Tokyo
+
+  # ----- Axum (Rust) バックエンド: 雛形 -----
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend
+    depends_on:
+      - tidb
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=mysql://root@tidb:4000/test_db
+      # ↑TiDBに接続するための例
+      # (ユーザやパスワード等は適宜設定)
