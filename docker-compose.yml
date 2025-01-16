@@ -57,4 +57,4 @@ services:
     environment:
       - DATABASE_URL=mysql://root@tidb:4000/test_db
       # ↑TiDBに接続するための例
-      # (ユーザやパスワード等は適宜設定)
+      # ユーザやパスワード等は適宜設定
