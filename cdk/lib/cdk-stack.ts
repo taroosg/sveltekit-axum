@@ -1,16 +1,35 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-// import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
+import { RemovalPolicy } from 'aws-cdk-lib';
 
 export class CdkStack extends cdk.Stack {
+  public readonly userPool: cognito.UserPool;
+  public readonly userPoolClient: cognito.UserPoolClient;
+
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // The code that defines your stack goes here
+    // --- Cognito User Pool ---
+    this.userPool = new cognito.UserPool(this, 'SvelteAxum', {
+      userPoolName: 'svelte-axum-userpool',
+      selfSignUpEnabled: true,
+      signInAliases: {
+        email: true
+      },
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
 
-    // example resource
-    // const queue = new sqs.Queue(this, 'CdkQueue', {
-    //   visibilityTimeout: cdk.Duration.seconds(300)
-    // });
+    // --- アプリクライアント ---
+    this.userPoolClient = this.userPool.addClient('SvelteAxumClient', {
+      userPoolClientName: 'svelte-axum-appclient',
+      generateSecret: false,
+      authFlows: {
+        userPassword: true,
+        userSrp: true
+      },
+      // ↑ ID/PW or SRP でログイン
+      // refreshTokenValidity: cdk.Duration.days(30),
+    });
   }
 }
