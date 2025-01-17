@@ -1,10 +1,19 @@
 use axum::extract::Extension;
-use axum::{body::Body, response::IntoResponse, routing::get, Router};
+use axum::{body::Body, middleware, response::IntoResponse, routing::get, Router};
 use lambda_http::{service_fn, Error, Request, RequestExt, Response};
 use std::net::SocketAddr;
+mod auth;
+
+use auth::{auth_middleware, get_auth_user};
 
 async fn hello_handler() -> impl IntoResponse {
     "Hello from Axum on Lambda!"
+}
+
+/// 認証後のハンドラ
+async fn protected_handler(user: axum::extract::Extension<auth::AuthUser>) -> String {
+    // user には sub / email が入っている
+    format!("Hello, sub={} / email={:?}", user.sub, user.email)
 }
 
 // For local dev
@@ -15,7 +24,11 @@ async fn main() -> Result<(), Error> {
         lambda_http::run(service_fn(handler_lambda)).await?;
     } else {
         // local dev: run normal Axum server
-        let app = Router::new().route("/", get(hello_handler));
+        let app = Router::new()
+            .route("/protected", get(protected_handler))
+            .layer(middleware::from_fn(auth_middleware))
+            .route("/", get(hello_handler));
+
         let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
         println!("Listening on {}", addr);
         axum::Server::bind(&addr)
@@ -28,7 +41,10 @@ async fn main() -> Result<(), Error> {
 // Lambda request => Axum router
 async fn handler_lambda(event: Request) -> Result<Response<String>, Error> {
     // Create Axum Router each invocation or keep it static
-    let _app: Router<(), Body> = Router::new().route("/", get(hello_handler));
+    let _app: Router<(), Body> = Router::new()
+        .route("/protected", get(protected_handler))
+        .layer(middleware::from_fn(auth_middleware))
+        .route("/", get(hello_handler));
     // For complex apps, you'd parse path, method, etc
     // but here we keep it minimal
     let resp_body = "Hello from Axum on Lambda (via APIGW)!";
