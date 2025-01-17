@@ -8,10 +8,17 @@ services:
     command:
       - "--name=pd"
       - "--data-dir=pd"
+      # クライアントからの接続 (client-urls)
       - "--client-urls=http://0.0.0.0:2379"
+      - "--advertise-client-urls=http://pd:2379"
+      # ピア接続 (peer-urls)
       - "--peer-urls=http://0.0.0.0:2380"
+      - "--advertise-peer-urls=http://pd:2380"
+      # 初期クラスタとして pd=http://pd:2380 を指定
       - "--initial-cluster=pd=http://pd:2380"
-      - "--log-level=info"
+      # ログレベル
+      - "-L"          # 短縮フラグでもOK
+      - "info"
     ports:
       - "2379:2379"
 
@@ -35,7 +42,8 @@ services:
     command:
       - "--store=tikv"
       - "--path=pd:2379"
-      - "--log-level=info"
+      - "-L"
+      - "info"
     depends_on:
       - pd
       - tikv
