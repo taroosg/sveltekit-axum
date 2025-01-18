@@ -58,11 +58,25 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: backend
-    depends_on:
-      - tidb
+    # Axumアプリのポート3000を外部に公開
     ports:
       - "3000:3000"
-    environment:
-      - DATABASE_URL=mysql://root@tidb:4000/test_db
+    # ソースコードをコンテナにマウントしてホットリロード
+    volumes:
+      - ./backend:/app
+      # 以下はビルドキャッシュ用 (任意)
+      - cargo-cache:/usr/local/cargo/registry
+      - cargo-target:/app/target
+    # DB接続情報などをロード
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - tidb
+    # environment:
+    #   - DATABASE_URL=mysql://root@tidb:4000/test_db
       # ↑TiDBに接続するための例
       # ユーザやパスワード等は適宜設定
+
+volumes:
+  cargo-cache:
+  cargo-target:
