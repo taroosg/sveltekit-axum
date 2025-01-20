@@ -4,16 +4,11 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import { RemovalPolicy } from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as path from 'path';
-import * as apigw from 'aws-cdk-lib/aws-apigatewayv2';
-import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
-import {
-  HttpJwtAuthorizer,
-} from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 export class CdkStack extends cdk.Stack {
   public readonly userPool: cognito.UserPool;
   public readonly userPoolClient: cognito.UserPoolClient;
   public readonly myLambda: lambda.Function;
-  public readonly httpApi: apigw.HttpApi;
+  public readonly functionUrl: lambda.FunctionUrl;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -54,57 +49,20 @@ export class CdkStack extends cdk.Stack {
       },
     });
 
-    // --- APIGateway HTTP API ---
-    this.httpApi = new apigw.HttpApi(this, 'MyHttpApi', {
-      apiName: 'myproject-httpapi',
-      createDefaultStage: true,
+        // --- Lambda Function URL ---
+    this.functionUrl = this.myLambda.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowedOrigins: ['*'],
+        allowedMethods: [
+          lambda.HttpMethod.ALL,
+        ],
+      },
     });
 
-    // Lambda インテグレーション
-    const lambdaIntegration = new integrations.HttpLambdaIntegration(
-      'MyLambdaIntegration',
-      this.myLambda
-    );
-
-    // Cognito JWT オーソライザー
-    const issuer = `https://cognito-idp.${this.region}.amazonaws.com/${this.userPool.userPoolId}`;
-    const audience = [this.userPoolClient.userPoolClientId];
-
-    const jwtAuthorizer = new HttpJwtAuthorizer(
-      'MyCognitoAuthorizer',
-      issuer,
-      {
-        jwtAudience: audience,
-        authorizerName: 'MyCognitoAuthorizer',
-      }
-    );
-
-    // -- ルートにオーソライザーを設定して保護 --
-    this.httpApi.addRoutes({
-      path: '/protected',
-      methods: [apigw.HttpMethod.ANY],
-      integration: lambdaIntegration,
-      authorizer: jwtAuthorizer,
-    });
-
-    this.httpApi.addRoutes({
-      path: '/fuga',
-      methods: [apigw.HttpMethod.ANY],
-      integration: lambdaIntegration,
-      authorizer: jwtAuthorizer,
-    });
-
-    // -- パブリックなルート "/" はオーソライザーなし --
-    this.httpApi.addRoutes({
-      path: '/',
-      methods: [apigw.HttpMethod.ANY],
-      integration: lambdaIntegration,
-    });
-
-    this.httpApi.addRoutes({
-      path: '/hoge',
-      methods: [apigw.HttpMethod.ANY],
-      integration: lambdaIntegration,
+    // Function URL を出力
+    new cdk.CfnOutput(this, 'FunctionUrl', {
+      value: this.functionUrl.url,
     });
 
   }
