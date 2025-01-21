@@ -33,6 +33,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: backend
+    command: cargo watch -x run
     ports:
       - "3000:3000"
     volumes:

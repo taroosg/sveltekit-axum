@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS posts (
+    id SERIAL PRIMARY KEY,
+    user_sub VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    image_url VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);

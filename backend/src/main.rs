@@ -14,6 +14,9 @@ use tower::ServiceExt;
 mod auth;
 use auth::{auth_middleware, AuthUser};
 
+mod db;
+use db::create_db_pool;
+
 /// 認証しない場合のハンドラ
 async fn hello_handler() -> impl IntoResponse {
     "Hello from Axum on Lambda!"
@@ -92,6 +95,9 @@ async fn run_local_dev() -> Result<(), Box<dyn std::error::Error>> {
 /// エントリーポイント
 #[tokio::main]
 async fn main() -> Result<(), LambdaError> {
+    // db
+    let _pool = create_db_pool().await;
+
     // AWS Lambda 環境では AWS_LAMBDA_FUNCTION_NAME が設定される
     if std::env::var("AWS_LAMBDA_FUNCTION_NAME").is_ok() {
         // Lambda 本番動作: lambda_http::run(service_fn(...))
