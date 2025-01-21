@@ -14,10 +14,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v1
+
+      - name: Run Zig build test
         run: |
-          sudo apt update
-          sudo apt install -y zig
+          zig build test
 
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
