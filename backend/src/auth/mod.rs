@@ -45,7 +45,7 @@ pub async fn auth_middleware<B>(
 
     // 2) デコードキー取得
     let region = env::var("COGNITO_REGION").unwrap_or("us-east-1".to_string());
-    let user_pool_id = env::var("COGNITO_USERPOOL_ID").expect("UserPoolId needed");
+    let user_pool_id = env::var("COGNITO_USER_POOL_ID").expect("UserPoolId needed");
 
     let decoding_key = get_decoding_key_for_kid(&kid, &region, &user_pool_id)
         .await
@@ -56,7 +56,8 @@ pub async fn auth_middleware<B>(
     validation.set_issuer(&[format!(
         "https://cognito-idp.{region}.amazonaws.com/{user_pool_id}"
     )]);
-    validation.set_audience(&[env::var("COGNITO_APP_CLIENT_ID").expect("AppClientId needed")]);
+    validation
+        .set_audience(&[env::var("COGNITO_USER_POOL_CLIENT_ID").expect("AppClientId needed")]);
 
     let token_data: TokenData<CognitoClaims> =
         decode(&token, &decoding_key, &validation).map_err(|_| StatusCode::UNAUTHORIZED)?;
