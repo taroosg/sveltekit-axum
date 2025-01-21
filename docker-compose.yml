@@ -1,56 +1,31 @@
 version: '3.7'
 
 services:
-  # ----- TiDB (分散DB) -----
-  pd:
-    image: pingcap/pd:latest
-    container_name: pd
-    command:
-      - "--name=pd"
-      - "--data-dir=pd"
-      # クライアントからの接続 (client-urls)
-      - "--client-urls=http://0.0.0.0:2379"
-      - "--advertise-client-urls=http://pd:2379"
-      # ピア接続 (peer-urls)
-      - "--peer-urls=http://0.0.0.0:2380"
-      - "--advertise-peer-urls=http://pd:2380"
-      # 初期クラスタとして pd=http://pd:2380 を指定
-      - "--initial-cluster=pd=http://pd:2380"
-      # ログレベル
-      - "-L"          # 短縮フラグでもOK
-      - "info"
-    ports:
-      - "2379:2379"
 
-  tikv:
-    image: pingcap/tikv:latest
-    container_name: tikv
-    command:
-      - "--addr=0.0.0.0:20160"
-      - "--advertise-addr=tikv:20160"
-      - "--pd=pd:2379"
-      - "--data-dir=tikv"
-      - "--log-level=info"
-    depends_on:
-      - pd
-    ports:
-      - "20160:20160"
-
-  tidb:
-    image: pingcap/tidb:latest
-    container_name: tidb
-    command:
-      - "--store=tikv"
-      - "--path=pd:2379"
-      - "-L"
-      - "info"
-    depends_on:
-      - pd
-      - tikv
-    ports:
-      - "4000:4000"
+  # ----- PostgreSQLデータベース -----
+  db:
+    image: postgres:17
     environment:
-      - TZ=Asia/Tokyo
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mydb
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    volumes:
+      - ./config/servers.json:/pgadmin4/servers.json
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "admin@example.com"
+      PGADMIN_DEFAULT_PASSWORD: "password"
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
 
   # ----- Axum (Rust) バックエンド: 雛形 -----
   backend:
@@ -58,25 +33,26 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: backend
-    # Axumアプリのポート3000を外部に公開
     ports:
       - "3000:3000"
-    # ソースコードをコンテナにマウントしてホットリロード
     volumes:
       - ./backend:/app
-      # 以下はビルドキャッシュ用 (任意)
       - cargo-cache:/usr/local/cargo/registry
       - cargo-target:/app/target
     # DB接続情報などをロード
     env_file:
       - ./backend/.env
+    environment:
+      ENV: local
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: myuser
+      DB_PASSWORD: password
+      DB_NAME: mydb
     depends_on:
-      - tidb
-    # environment:
-    #   - DATABASE_URL=mysql://root@tidb:4000/test_db
-      # ↑TiDBに接続するための例
-      # ユーザやパスワード等は適宜設定
+      - db
 
 volumes:
+  db-data:
   cargo-cache:
   cargo-target:
