@@ -1,6 +1,7 @@
 use jsonwebtoken::DecodingKey;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
+use std::fmt;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 
@@ -14,6 +15,16 @@ pub enum AuthError {
     InvalidKeyFormat(String),
 }
 
+impl fmt::Display for AuthError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AuthError::FetchError(msg) => write!(f, "FetchError: {}", msg),
+            AuthError::MissingKid => write!(f, "MissingKid"),
+            AuthError::InvalidKeyFormat(msg) => write!(f, "InvalidKeyFormat: {}", msg),
+        }
+    }
+}
+
 /// Cognito JWK セット
 #[derive(Debug, Deserialize)]
 pub struct JwkSet {
@@ -25,8 +36,8 @@ pub struct JwkSet {
 pub struct Jwk {
     // pub alg: String,
     // pub kty: String,
-    #[serde(rename = "use")]
-    pub use_: String,
+    // #[serde(rename = "use")]
+    // pub use_: String,
     pub n: String,
     pub e: String,
     pub kid: String,

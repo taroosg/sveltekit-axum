@@ -74,9 +74,9 @@ pub async fn auth_middleware<B>(
     Ok(next.run(req).await)
 }
 
-/// ユーザを取り出すためのヘルパー
-pub async fn get_auth_user(
-    axum::extract::Extension(user): axum::extract::Extension<AuthUser>,
-) -> AuthUser {
-    user
-}
+// ユーザを取り出すためのヘルパー
+// pub async fn get_auth_user(
+//     axum::extract::Extension(user): axum::extract::Extension<AuthUser>,
+// ) -> AuthUser {
+//     user
+// }
