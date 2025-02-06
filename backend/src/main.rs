@@ -1,3 +1,6 @@
+mod auth;
+mod db;
+mod routes;
 use axum::{
     body::Body,
     extract::Extension,
@@ -7,15 +10,14 @@ use axum::{
     routing::get,
     Router,
 };
+use dotenvy::dotenv;
 use lambda_http::{service_fn, Error as LambdaError, Request, Response};
 use std::net::SocketAddr;
 use tower::ServiceExt;
 
-mod auth;
 use auth::{auth_middleware, AuthUser};
-
-mod db;
 use db::create_db_pool;
+use routes::post_routes::post_routes;
 
 /// 認証しない場合のハンドラ
 async fn hello_handler() -> impl IntoResponse {
@@ -29,15 +31,6 @@ async fn hoge_handler() -> impl IntoResponse {
 /// axumで認証する場合のハンドラ
 async fn protected_handler(Extension(user): Extension<AuthUser>) -> String {
     format!("Hello, sub={} / email={:?}", user.sub, user.email)
-}
-
-fn create_app() -> Router {
-    Router::new()
-        .route("/protected", get(protected_handler))
-        .layer(middleware::from_fn(auth_middleware))
-        .route("/fuga", get(hoge_handler))
-        .route("/hoge", get(hoge_handler))
-        .route("/", get(hello_handler))
 }
 
 async fn lambda_req_to_axum_req(event: Request) -> Result<AxumRequest<Body>, LambdaError> {
@@ -66,9 +59,7 @@ async fn axum_resp_to_lambda_resp(
 }
 
 /// Lambda ハンドラ（Axum Router をワンショットで呼ぶ）
-async fn handler_lambda(event: Request) -> Result<Response<String>, LambdaError> {
-    let app = create_app();
-
+async fn handler_lambda(event: Request, app: Router) -> Result<Response<String>, LambdaError> {
     let axum_req = lambda_req_to_axum_req(event).await?;
     let axum_resp = app
         .oneshot(axum_req)
@@ -79,32 +70,35 @@ async fn handler_lambda(event: Request) -> Result<Response<String>, LambdaError>
 }
 
 /// ローカル開発用メイン関数
-async fn run_local_dev() -> Result<(), Box<dyn std::error::Error>> {
-    let app = create_app();
-
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
-    println!("Listening on {}", addr);
-
+async fn run_local_dev(app: Router) -> Result<(), Box<dyn std::error::Error>> {
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    println!("Local dev server on http://{addr}");
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await?;
-
     Ok(())
 }
 
-/// エントリーポイント
 #[tokio::main]
 async fn main() -> Result<(), LambdaError> {
-    // db
-    let _pool = create_db_pool().await;
+    dotenv().ok();
 
-    // AWS Lambda 環境では AWS_LAMBDA_FUNCTION_NAME が設定される
+    // db
+    let pool = create_db_pool().await;
+
+    let app = Router::new()
+        .route("/protected", get(protected_handler))
+        .layer(middleware::from_fn(auth_middleware))
+        .nest("/posts", post_routes())
+        .layer(Extension(pool))
+        .route("/fuga", get(hoge_handler))
+        .route("/hoge", get(hoge_handler))
+        .route("/", get(hello_handler));
+
     if std::env::var("AWS_LAMBDA_FUNCTION_NAME").is_ok() {
-        // Lambda 本番動作: lambda_http::run(service_fn(...))
-        lambda_http::run(service_fn(handler_lambda)).await?;
+        lambda_http::run(service_fn(move |event| handler_lambda(event, app.clone()))).await?;
     } else {
-        // ローカル開発
-        run_local_dev()
+        run_local_dev(app)
             .await
             .map_err(|err| LambdaError::from(format!("Local server error: {:?}", err)))?;
     }
